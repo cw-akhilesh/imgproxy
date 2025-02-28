@@ -1,6 +1,7 @@
 package options
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/imgproxy/imgproxy/v3/config"
@@ -38,3 +39,13 @@ func parseURLOptions(opts []string) (urlOptions, []string) {
 
 	return parsed, rest
 }
+
+func parseURLOptionsIPC(size string, qs url.Values) (urlOptions) {
+	parsed := make(urlOptions, 0, len(qs) + 1)
+
+	parsed = append(parsed, urlOption{Name: "rs", Args:  []string{"fill-down", strings.Split(size, "x")[0], strings.Split(size, "x")[1]} })
+
+	
+	return parsed
+}
+

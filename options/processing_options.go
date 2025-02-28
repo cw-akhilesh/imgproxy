@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -142,7 +143,7 @@ func NewProcessingOptions() *ProcessingOptions {
 		Format:            imagetype.Unknown,
 		Background:        vips.Color{R: 255, G: 255, B: 255},
 		Blur:              0,
-		Sharpen:           0,
+		Sharpen:           0.5,
 		Dpr:               1,
 		Watermark:         WatermarkOptions{Opacity: 1, Position: GravityOptions{Type: GravityCenter}},
 		StripMetadata:     config.StripMetadata,
@@ -1200,11 +1201,7 @@ func ParsePath(path string, headers http.Header) (*ProcessingOptions, string, er
 		err      error
 	)
 
-	if config.OnlyPresets {
-		po, imageURL, err = parsePathPresets(parts, headers)
-	} else {
-		po, imageURL, err = parsePathOptions(parts, headers)
-	}
+	po, imageURL, err = parsePathOptions(parts, headers)
 
 	if err != nil {
 		return nil, "", ierrors.New(404, err.Error(), "Invalid URL")
@@ -1212,3 +1209,37 @@ func ParsePath(path string, headers http.Header) (*ProcessingOptions, string, er
 
 	return po, imageURL, nil
 }
+
+func ParsePathIPC(path string, qs url.Values, headers http.Header) (*ProcessingOptions, string, error) {
+	if path == "" || path == "/" {
+		return nil, "", ierrors.New(404, fmt.Sprintf("Invalid path: %s", path), "Invalid URL")
+	}
+
+	po, err := defaultProcessingOptions(headers)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	imageURL := path
+
+	parts := strings.SplitN(imageURL, "/", 2)
+	imgResize := strings.ToLower(parts[0])
+	url :=  "s3://m-aeplimages/" + strings.ToLower(parts[1])
+
+	path = strings.TrimPrefix(path, "/")
+
+	options := parseURLOptionsIPC(imgResize, qs)
+
+	if err = applyURLOptions(po, options); err != nil {
+		return nil, "", err
+	}
+
+
+	if err != nil {
+		return nil, "", ierrors.New(404, err.Error(), "Invalid URL")
+	}
+
+	return po, url, nil
+}
+

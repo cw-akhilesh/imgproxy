@@ -215,34 +215,12 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	path := r.RequestURI
-	if queryStart := strings.IndexByte(path, '?'); queryStart >= 0 {
-		path = path[:queryStart]
-	}
 
-	if len(config.PathPrefix) > 0 {
-		path = strings.TrimPrefix(path, config.PathPrefix)
-	}
+	qs := r.URL.Query()
 
-	path = strings.TrimPrefix(path, "/")
-	signature := ""
 
-	if signatureEnd := strings.IndexByte(path, '/'); signatureEnd > 0 {
-		signature = path[:signatureEnd]
-		path = path[signatureEnd:]
-	} else {
-		sendErrAndPanic(ctx, "path_parsing", ierrors.New(
-			404, fmt.Sprintf("Invalid path: %s", path), "Invalid URL",
-		))
-	}
+	po, imageURL, err := options.ParsePathIPC(r.URL.Path[1:], qs, r.Header)
 
-	path = fixPath(path)
-
-	if err := security.VerifySignature(signature, path); err != nil {
-		sendErrAndPanic(ctx, "security", ierrors.New(403, err.Error(), "Forbidden"))
-	}
-
-	po, imageURL, err := options.ParsePath(path, r.Header)
 	checkErr(ctx, "path_parsing", err)
 
 	errorreport.SetMetadata(r, "Source Image URL", imageURL)
