@@ -276,7 +276,7 @@ func Reset() {
 	SvgFixUnsupported = false
 
 	AutoWebp = false
-	EnforceWebp = false
+	EnforceWebp = true
 	AutoAvif = true
 	EnforceAvif = false
 	AutoJxl = false
@@ -322,8 +322,8 @@ func Reset() {
 
 	SourceURLQuerySeparator = "?"
 	LocalFileSystemRoot = ""
-	S3Enabled = false
-	S3Region = ""
+	S3Enabled = true
+	S3Region = "ap-south-1"
 	S3Endpoint = ""
 	S3EndpointUsePathStyle = true
 	S3AssumeRoleArn = ""
