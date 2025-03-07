@@ -35,6 +35,7 @@ var mainPipeline = pipeline{
 	fixSize,
 	flatten,
 	watermark,
+	artifact,
 }
 
 var finalizePipeline = pipeline{

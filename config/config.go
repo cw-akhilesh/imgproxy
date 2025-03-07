@@ -277,7 +277,7 @@ func Reset() {
 
 	AutoWebp = false
 	EnforceWebp = false
-	AutoAvif = false
+	AutoAvif = true
 	EnforceAvif = false
 	AutoJxl = false
 	EnforceJxl = false

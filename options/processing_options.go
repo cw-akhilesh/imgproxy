@@ -15,6 +15,7 @@ import (
 
 	"github.com/imgproxy/imgproxy/v3/config"
 	"github.com/imgproxy/imgproxy/v3/ierrors"
+	"github.com/imgproxy/imgproxy/v3/imagedata"
 	"github.com/imgproxy/imgproxy/v3/imagetype"
 	"github.com/imgproxy/imgproxy/v3/imath"
 	"github.com/imgproxy/imgproxy/v3/security"
@@ -55,6 +56,15 @@ type TrimOptions struct {
 }
 
 type WatermarkOptions struct {
+	Type string
+	Enabled  bool
+	Opacity  float64
+	Position GravityOptions
+	Scale    float64
+}
+
+type ArtifactOptions struct {
+	Type string
 	Enabled  bool
 	Opacity  float64
 	Position GravityOptions
@@ -105,6 +115,8 @@ type ProcessingOptions struct {
 
 	Watermark WatermarkOptions
 
+	Artifact ArtifactOptions
+
 	PreferWebP  bool
 	EnforceWebP bool
 	PreferAvif  bool
@@ -146,6 +158,7 @@ func NewProcessingOptions() *ProcessingOptions {
 		Sharpen:           0.5,
 		Dpr:               1,
 		Watermark:         WatermarkOptions{Opacity: 1, Position: GravityOptions{Type: GravityCenter}},
+		Artifact:          ArtifactOptions{Opacity: 1, Position: GravityOptions{Type: GravityCenter}},
 		StripMetadata:     config.StripMetadata,
 		KeepCopyright:     config.KeepCopyright,
 		StripColorProfile: config.StripColorProfile,
@@ -708,48 +721,96 @@ func applyPresetOption(po *ProcessingOptions, args []string, usedPresets ...stri
 }
 
 func applyWatermarkOption(po *ProcessingOptions, args []string) error {
-	if len(args) > 7 {
+	if len(args) == 0 {
+		return fmt.Errorf("Invalid watermark arguments: %v", args)
+	}
+	po.Watermark.Enabled  = true
+	po.Watermark.Opacity = 1
+	po.Watermark.Type = args[0]
+	po.Watermark.Position.Type = GravitySouthEast
+	po.Watermark.Position.X = 17
+	po.Watermark.Position.Y = 6
+	po.Watermark.Scale = 0
+
+	// if len(args) > 1 && len(args[1]) > 0 {
+	// 	if g, ok := gravityTypes[args[1]]; ok && slices.Contains(watermarkGravityTypes, g) {
+	// 		po.Watermark.Position.Type = g
+	// 	} else {
+	// 		return fmt.Errorf("Invalid watermark position: %s", args[1])
+	// 	}
+	// }
+
+	// if len(args) > 2 && len(args[2]) > 0 {
+	// 	if x, err := strconv.ParseFloat(args[2], 64); err == nil {
+	// 		po.Watermark.Position.X = x
+	// 	} else {
+	// 		return fmt.Errorf("Invalid watermark X offset: %s", args[2])
+	// 	}
+	// }
+
+	// if len(args) > 3 && len(args[3]) > 0 {
+	// 	if y, err := strconv.ParseFloat(args[3], 64); err == nil {
+	// 		po.Watermark.Position.Y = y
+	// 	} else {
+	// 		return fmt.Errorf("Invalid watermark Y offset: %s", args[3])
+	// 	}
+	// }
+
+	// if len(args) > 4 && len(args[4]) > 0 {
+	// 	if s, err := strconv.ParseFloat(args[4], 64); err == nil && s >= 0 {
+	// 		po.Watermark.Scale = s
+	// 	} else {
+	// 		return fmt.Errorf("Invalid watermark scale: %s", args[4])
+	// 	}
+	// }
+
+	return nil
+}
+
+func applyArtifactOption(po *ProcessingOptions, args []string) error {
+	if len(args) == 0 {
 		return fmt.Errorf("Invalid watermark arguments: %v", args)
 	}
 
-	if o, err := strconv.ParseFloat(args[0], 64); err == nil && o >= 0 && o <= 1 {
-		po.Watermark.Enabled = o > 0
-		po.Watermark.Opacity = o
-	} else {
-		return fmt.Errorf("Invalid watermark opacity: %s", args[0])
-	}
+	artifactKey := fmt.Sprintf("%s_%dx%d", args[0], po.Width, po.Height)
 
-	if len(args) > 1 && len(args[1]) > 0 {
-		if g, ok := gravityTypes[args[1]]; ok && slices.Contains(watermarkGravityTypes, g) {
-			po.Watermark.Position.Type = g
-		} else {
-			return fmt.Errorf("Invalid watermark position: %s", args[1])
-		}
-	}
+	_, exist := imagedata.ArtifactMap[artifactKey]
 
-	if len(args) > 2 && len(args[2]) > 0 {
-		if x, err := strconv.ParseFloat(args[2], 64); err == nil {
-			po.Watermark.Position.X = x
-		} else {
-			return fmt.Errorf("Invalid watermark X offset: %s", args[2])
-		}
-	}
+	po.Artifact.Enabled  = exist
+	po.Artifact.Opacity = 1
+	po.Artifact.Type = artifactKey
 
-	if len(args) > 3 && len(args[3]) > 0 {
-		if y, err := strconv.ParseFloat(args[3], 64); err == nil {
-			po.Watermark.Position.Y = y
-		} else {
-			return fmt.Errorf("Invalid watermark Y offset: %s", args[3])
-		}
-	}
+	// if len(args) > 1 && len(args[1]) > 0 {
+	// 	if g, ok := gravityTypes[args[1]]; ok && slices.Contains(watermarkGravityTypes, g) {
+	// 		po.Watermark.Position.Type = g
+	// 	} else {
+	// 		return fmt.Errorf("Invalid watermark position: %s", args[1])
+	// 	}
+	// }
 
-	if len(args) > 4 && len(args[4]) > 0 {
-		if s, err := strconv.ParseFloat(args[4], 64); err == nil && s >= 0 {
-			po.Watermark.Scale = s
-		} else {
-			return fmt.Errorf("Invalid watermark scale: %s", args[4])
-		}
-	}
+	// if len(args) > 2 && len(args[2]) > 0 {
+	// 	if x, err := strconv.ParseFloat(args[2], 64); err == nil {
+	// 		po.Watermark.Position.X = x
+	// 	} else {
+	// 		return fmt.Errorf("Invalid watermark X offset: %s", args[2])
+	// 	}
+	// }
+
+	// if len(args) > 3 && len(args[3]) > 0 {
+	// 	if y, err := strconv.ParseFloat(args[3], 64); err == nil {
+	// 		po.Watermark.Position.Y = y
+	// 	} else {
+	// 		return fmt.Errorf("Invalid watermark Y offset: %s", args[3])
+	// 	}
+	// }
+
+	// if len(args) > 4 && len(args[4]) > 0 {
+	// 	if s, err := strconv.ParseFloat(args[4], 64); err == nil && s >= 0 {
+	// 		po.Watermark.Scale = s
+	// 	} else {
+	// 		return fmt.Errorf("Invalid watermark scale: %s", args[4])
+	// 	}
+	// }
 
 	return nil
 }
@@ -1019,6 +1080,8 @@ func applyURLOption(po *ProcessingOptions, name string, args []string, usedPrese
 		return applyPixelateOption(po, args)
 	case "watermark", "wm":
 		return applyWatermarkOption(po, args)
+	case "artifcact", "art":
+		return applyArtifactOption(po, args)
 	case "strip_metadata", "sm":
 		return applyStripMetadataOption(po, args)
 	case "keep_copyright", "kcr":

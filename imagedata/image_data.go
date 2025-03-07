@@ -65,10 +65,10 @@ func Init() error {
 func loadWatermarkAndArtifacts() error {
 	ctx := context.Background()
 
-	watermarks := map[string]*ImageData{
-		"s3://m-aeplimages/watermarks/cw_watermark.png": CWWatermark,
-		"s3://m-aeplimages/watermarks/bw_watermark.png" : BWWatermark,
-		"s3://m-aeplimages/watermarks/bw_watermark_v2.png" : BWWatermarkV2,
+	watermarks := map[string]**ImageData{
+		"s3://m-aeplimages/watermarks/cw_watermark.png": &CWWatermark,
+		"s3://m-aeplimages/watermarks/bw_watermark.png" : &BWWatermark,
+		"s3://m-aeplimages/watermarks/bw_watermark_v2.png" : &BWWatermarkV2,
 	}
 
 	artifacts := map[string]string{
@@ -101,7 +101,7 @@ func loadWatermarkAndArtifacts() error {
 		if err != nil {
 			return fmt.Errorf("failed to download watermark from %s: %w", url, err)
 		}
-		watermarks[url] = download // Assign the downloaded image data to the pointer
+		*watermarks[url] = download // Assign the downloaded image data to the pointer
 	}
 
 	// Ensure ArtifactMap is initialized
