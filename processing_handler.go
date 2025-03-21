@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -138,8 +139,7 @@ func respondWithImage(reqID string, r *http.Request, rw http.ResponseWriter, sta
 
 	var ierr *ierrors.Error
 	if err != nil {
-		ierr = ierrors.New(statusCode, fmt.Sprintf("Failed to write response: %s", err), "Failed to write response")
-		ierr.Unexpected = true
+		ierr = newResponseWriteError(err)
 
 		if config.ReportIOErrors {
 			sendErr(r.Context(), "IO", ierr)
@@ -174,7 +174,7 @@ func sendErr(ctx context.Context, errType string, err error) {
 	send := true
 
 	if ierr, ok := err.(*ierrors.Error); ok {
-		switch ierr.StatusCode {
+		switch ierr.StatusCode() {
 		case http.StatusServiceUnavailable:
 			errType = "timeout"
 		case 499:
@@ -230,10 +230,9 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 
 	// SVG is a special case. Though saving to svg is not supported, SVG->SVG is.
 	if !vips.SupportsSave(po.Format) && po.Format != imagetype.Unknown && po.Format != imagetype.SVG {
-		sendErrAndPanic(ctx, "path_parsing", ierrors.New(
-			422,
-			fmt.Sprintf("Resulting image format is not supported: %s", po.Format),
-			"Invalid URL",
+		sendErrAndPanic(ctx, "path_parsing", newInvalidURLErrorf(
+			http.StatusUnprocessableEntity,
+			"Resulting image format is not supported: %s", po.Format,
 		))
 	}
 
@@ -260,7 +259,7 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 	if queueSem != nil {
 		acquired := queueSem.TryAcquire(1)
 		if !acquired {
-			panic(ierrors.New(429, "Too many requests", "Too many requests"))
+			panic(newTooManyRequestsError())
 		}
 		defer queueSem.Release(1)
 	}
@@ -303,21 +302,28 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 		return imagedata.Download(ctx, imageURL, "source image", downloadOpts, po.SecurityOptions)
 	}()
 
-	if err == nil {
+	var nmErr imagedata.NotModifiedError
+
+	switch {
+	case err == nil:
 		defer originData.Close()
-	} else if nmErr, ok := err.(*imagedata.ErrorNotModified); ok {
+
+	case errors.As(err, &nmErr):
 		if config.ETagEnabled && len(etagHandler.ImageEtagExpected()) != 0 {
 			rw.Header().Set("ETag", etagHandler.GenerateExpectedETag())
 		}
-		respondWithNotModified(reqID, r, rw, po, imageURL, nmErr.Headers)
+		respondWithNotModified(reqID, r, rw, po, imageURL, nmErr.Headers())
 		return
-	} else {
+
+	default:
 		// This may be a request timeout error or a request cancelled error.
 		// Check it before moving further
 		checkErr(ctx, "timeout", router.CheckTimeout(ctx))
 
 		ierr := ierrors.Wrap(err, 0)
-		ierr.Unexpected = ierr.Unexpected || config.ReportDownloadingErrors
+		if config.ReportDownloadingErrors {
+			ierr = ierrors.Wrap(ierr, 0, ierrors.WithShouldReport(true))
+		}
 
 		sendErr(ctx, "download", ierr)
 
@@ -327,7 +333,7 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 
 		// We didn't panic, so the error is not reported.
 		// Report it now
-		if ierr.Unexpected {
+		if ierr.ShouldReport() {
 			errorreport.Report(ierr, r)
 		}
 
@@ -336,7 +342,7 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 		if config.FallbackImageHTTPCode > 0 {
 			statusCode = config.FallbackImageHTTPCode
 		} else {
-			statusCode = ierr.StatusCode
+			statusCode = ierr.StatusCode()
 		}
 
 		originData = imagedata.FallbackImage
@@ -382,17 +388,17 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if !vips.SupportsLoad(originData.Type) {
-		sendErrAndPanic(ctx, "processing", ierrors.New(
-			422,
-			fmt.Sprintf("Source image format is not supported: %s", originData.Type),
-			"Invalid URL",
+		sendErrAndPanic(ctx, "processing", newInvalidURLErrorf(
+			http.StatusUnprocessableEntity,
+			"Source image format is not supported: %s", originData.Type,
 		))
 	}
 
 	// At this point we can't allow requested format to be SVG as we can't save SVGs
 	if po.Format == imagetype.SVG {
-		sendErrAndPanic(ctx, "processing", ierrors.New(
-			422, "Resulting image format is not supported: svg", "Invalid URL",
+		sendErrAndPanic(ctx, "processing", newInvalidURLErrorf(
+			http.StatusUnprocessableEntity,
+			"Resulting image format is not supported: svg",
 		))
 	}
 
