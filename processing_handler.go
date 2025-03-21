@@ -116,18 +116,12 @@ func setCanonical(rw http.ResponseWriter, originURL string) {
 }
 
 func respondWithImage(reqID string, r *http.Request, rw http.ResponseWriter, statusCode int, resultData *imagedata.ImageData, po *options.ProcessingOptions, originURL string, originData *imagedata.ImageData) {
-	var contentDisposition string
-	if len(po.Filename) > 0 {
-		contentDisposition = resultData.Type.ContentDisposition(po.Filename, po.ReturnAttachment)
-	} else {
-		contentDisposition = resultData.Type.ContentDispositionFromURL(originURL, po.ReturnAttachment)
-	}
-
 	rw.Header().Set("Content-Type", resultData.Type.Mime())
-	rw.Header().Set("Content-Disposition", contentDisposition)
 
-	setCacheControl(rw, po.Expires, originData.Headers)
-	setLastModified(rw, originData.Headers)
+	rw.Header().Set("Cache-Control", "max-age: 31536000, public")
+	rw.Header().Set("Last-Modified", time.Now().Format(http.TimeFormat))
+	rw.Header().Set("Expires", time.Now().AddDate(1, 0, 0).Format(http.TimeFormat))
+
 	setVary(rw)
 	setCanonical(rw, originURL)
 
@@ -139,9 +133,6 @@ func respondWithImage(reqID string, r *http.Request, rw http.ResponseWriter, sta
 		rw.Header().Set("X-Result-Height", resultData.Headers["X-Result-Height"])
 	}
 
-	rw.Header().Set("Content-Security-Policy", "script-src 'none'")
-
-	rw.Header().Set("Content-Length", strconv.Itoa(len(resultData.Data)))
 	rw.WriteHeader(statusCode)
 	_, err := rw.Write(resultData.Data)
 
