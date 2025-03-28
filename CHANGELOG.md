@@ -20,6 +20,10 @@
 - (pro) Fix passing through request headers with the `IMGPROXY_REQUEST_HEADERS_PASSTHROUGH` when the `raw` option is used.
 - (pro) Fix `IMGPROXY_BEST_FORMAT_ALLOW_SKIPS` config behavior.
 - (pro) Fix flattening behavior when chained pipelines are used and the resulting format doesn't support transparency.
+- (pro) Fix advanced smart crop when the most feature points are located close to the right or the bottom edge.
+
+### Removed
+- Remove the `IMGPROXY_S3_MULTI_REGION` config. imgproxy now always work in multi-regional S3 mode.
 
 ## [3.27.2] - 2025-01-27
 ### Fixed
